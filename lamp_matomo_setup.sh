@@ -105,51 +105,48 @@ apt install git -y
 echo "[INFO] Setting up Matomo..."
 MATOMO_DIR=/var/www/${HOSTNAME}/matomo
 git clone https://github.com/matomo-org/matomo.git ${MATOMO_DIR}
-chown -R www-data:www-data ${MATOMO_DIR}
-chmod -R 755 ${MATOMO_DIR}
+cd ${MATOMO_DIR}
 
-# Ask for Matomo admin information
-read -p "Enter Matomo Admin Email: " MATOMO_ADMIN_EMAIL
-read -p "Enter Matomo Admin Username: " MATOMO_ADMIN_USERNAME
-MATOMO_ADMIN_PASSWORD=$(generate_password)
+echo "[INFO] Checking out a stable release..."
+git checkout 5.1.1
+git submodule update --init --recursive
 
+# Install Composer and required dependencies
+echo "[INFO] Installing Composer dependencies..."
+curl -sS https://getcomposer.org/installer | php
+php composer.phar install --no-dev
+
+# Configure Matomo database
 echo "[INFO] Configuring Matomo Database..."
 MATOMO_DB_NAME="matomo"
 MATOMO_DB_USER="matomo_user"
 MATOMO_DB_PASSWORD=$(generate_password)
+MATOMO_ADMIN_USERNAME="admin"
+MATOMO_ADMIN_PASSWORD=$(generate_password)
+MATOMO_ADMIN_EMAIL="admin@example.com"
 
 mysql --execute="CREATE DATABASE ${MATOMO_DB_NAME};"
 mysql --execute="CREATE USER '${MATOMO_DB_USER}'@'localhost' IDENTIFIED BY '${MATOMO_DB_PASSWORD}';"
 mysql --execute="GRANT ALL PRIVILEGES ON ${MATOMO_DB_NAME}.* TO '${MATOMO_DB_USER}'@'localhost';"
 mysql --execute="FLUSH PRIVILEGES;"
 
-cat << EOF > ${MATOMO_DIR}/config.ini.php
-[database]
-host = "127.0.0.1"
-username = "${MATOMO_DB_USER}"
-password = "${MATOMO_DB_PASSWORD}"
-dbname = "${MATOMO_DB_NAME}"
-adapter = "PDO_MYSQL"
-port = 3306
+# Preload Matomo database schema
+echo "[INFO] Loading Matomo database schema..."
+php ${MATOMO_DIR}/console core:update --yes
 
-[General]
-assume_secure_protocol = 0
-trusted_hosts[] = "${HOSTNAME}"
-EOF
+# Disable development mode
+echo "[INFO] Disabling Matomo development mode..."
+php ${MATOMO_DIR}/console development:disable
 
-# Set up No-IP client
-echo "[INFO] Setting up No-IP client..."
-wget --content-disposition https://www.noip.com/download/linux/latest
-LATEST_FILE=$(ls noip-duc_*.tar.gz | tail -n 1)
-tar xf $LATEST_FILE
-LATEST_DIR=$(tar -tzf $LATEST_FILE | head -1 | cut -f1 -d"/")
-cd $LATEST_DIR
-sudo make install
+# Generate Matomo admin user
+echo "[INFO] Creating Matomo admin user..."
+php ${MATOMO_DIR}/console core:create-user --superuser --login=${MATOMO_ADMIN_USERNAME} --password=${MATOMO_ADMIN_PASSWORD} --email=${MATOMO_ADMIN_EMAIL}
 
-echo "[INFO] Please follow the prompts to configure the No-IP client."
-sudo /usr/local/bin/noip2 -C
+# Set permissions
+chown -R www-data:www-data ${MATOMO_DIR}
+chmod -R 755 ${MATOMO_DIR}
 
-# Display MySQL password, Matomo details, and webserver URL
+# Display output
 IP_ADDRESS=$(hostname -I | awk '{print $1}')
 echo "[INFO] Setup completed successfully!"
 echo "========================================="
