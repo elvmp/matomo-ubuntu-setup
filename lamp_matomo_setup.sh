@@ -70,9 +70,9 @@ EOF
   echo "[INFO] Virtual host configured for ${HOSTNAME}."
 }
 
-# Function to install Matomo
-install_matomo() {
-  echo "[INFO] Installing Matomo..."
+# Function to upload Matomo files
+upload_matomo() {
+  echo "[INFO] Uploading Matomo files..."
   read -p "Enter your hostname (e.g., example.com): " HOSTNAME
   if [ -z "$HOSTNAME" ]; then
     echo "[ERROR] Hostname cannot be empty. Exiting."
@@ -90,35 +90,6 @@ install_matomo() {
   curl -sS https://getcomposer.org/installer | php
   php composer.phar install --no-dev
 
-  echo "[INFO] Configuring Matomo Database..."
-  MATOMO_DB_NAME="matomo"
-  MATOMO_DB_USER="matomo_user"
-  MATOMO_DB_PASSWORD=$(generate_password)
-
-  mysql --execute="CREATE DATABASE ${MATOMO_DB_NAME};"
-  mysql --execute="CREATE USER '${MATOMO_DB_USER}'@'localhost' IDENTIFIED BY '${MATOMO_DB_PASSWORD}';"
-  mysql --execute="GRANT ALL PRIVILEGES ON ${MATOMO_DB_NAME}.* TO '${MATOMO_DB_USER}'@'localhost';"
-  mysql --execute="FLUSH PRIVILEGES;"
-
-  php ${MATOMO_DIR}/console core:update --yes
-
-  echo "[INFO] Generating Matomo configuration file..."
-  cat << EOF > ${MATOMO_DIR}/config/config.ini.php
-[database]
-host = "127.0.0.1"
-username = "${MATOMO_DB_USER}"
-password = "${MATOMO_DB_PASSWORD}"
-dbname = "${MATOMO_DB_NAME}"
-adapter = "PDO_MYSQL"
-port = 3306
-
-[General]
-assume_secure_protocol = 0
-trusted_hosts[] = "${HOSTNAME}"
-EOF
-
-  php ${MATOMO_DIR}/console development:disable
-
   chown -R www-data:www-data ${MATOMO_DIR}
   chmod -R 755 ${MATOMO_DIR}
 
@@ -131,28 +102,28 @@ EOF
   chown www-data:www-data ${VHOST_DIR}/info.php
   chmod 644 ${VHOST_DIR}/info.php
 
-  echo "[INFO] Matomo installed successfully in ${MATOMO_DIR}."
+  echo "[INFO] Matomo uploaded successfully to ${MATOMO_DIR}."
   echo "[INFO] PHP test file created at ${VHOST_DIR}/info.php."
 }
 
 # Main menu
 echo "Select an installation option:"
-echo "1. Full install (Apache, MySQL, PHP, Matomo)"
+echo "1. Full install (Apache, MySQL, PHP, Matomo upload)"
 echo "2. Install Apache, MySQL, and PHP"
-echo "3. Install Matomo"
+echo "3. Upload Matomo files"
 echo "4. Exit"
 read -p "Enter your choice: " CHOICE
 
 case $CHOICE in
   1)
     install_apache_mysql_php
-    install_matomo
+    upload_matomo
     ;;
   2)
     install_apache_mysql_php
     ;;
   3)
-    install_matomo
+    upload_matomo
     ;;
   4)
     echo "Exiting."
@@ -170,7 +141,6 @@ if [ "$CHOICE" == "1" ]; then
   echo "[INFO] Full setup completed successfully!"
   echo "========================================="
   echo "MySQL Root Password: ${MYSQL_ROOT_PASSWORD}"
-  echo "Matomo Database User Password: ${MATOMO_DB_PASSWORD}"
   echo "Matomo URL: http://${IP_ADDRESS}/matomo"
   echo "PHP Info URL: http://${IP_ADDRESS}/info.php"
   echo "========================================="
