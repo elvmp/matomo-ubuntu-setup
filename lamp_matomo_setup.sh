@@ -9,13 +9,26 @@ generate_password() {
 install_ssh() {
   echo "[INFO] Ensuring SSH server is installed..."
   if ! dpkg -l | grep -q openssh-server; then
-    apt update -y && apt install openssh-server -y
-    echo "[INFO] SSH server installed."
+    apt update -y
+    if apt install openssh-server -y; then
+      echo "[INFO] SSH server installed successfully."
+    else
+      echo "[ERROR] Failed to install SSH server. Exiting."
+      exit 1
+    fi
+  else
+    echo "[INFO] SSH server is already installed."
   fi
+
   sed -i 's/^#*PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
   sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
-  systemctl restart sshd
-  echo "[INFO] Root login with password enabled. SSH service restarted."
+
+  if systemctl restart sshd; then
+    echo "[INFO] Root login with password enabled. SSH service restarted."
+  else
+    echo "[ERROR] Failed to restart SSH service. Please check your configuration."
+    exit 1
+  fi
 }
 
 # Function to install Apache, MySQL, and PHP
@@ -151,13 +164,28 @@ install_noip() {
   echo "[INFO] Installing No-IP Dynamic Update Client (DUC)..."
   wget --content-disposition https://www.noip.com/download/linux/latest -O noip.tar.gz
   tar xf noip.tar.gz
-  cd noip-duc-*/binaries
-  apt install ./noip-duc_*_amd64.deb
-  if [ $? -ne 0 ]; then
-    echo "[ERROR] Failed to install No-IP DUC. Please check the logs."
+  NOIP_DIR=$(find . -type d -name "noip-duc-*" | head -n 1)
+  if [ -z "$NOIP_DIR" ]; then
+    echo "[ERROR] No-IP DUC directory not found after extraction. Exiting."
     exit 1
   fi
-  echo "[INFO] No-IP DUC installed."
+  cd $NOIP_DIR/binaries
+  if apt install ./*.deb; then
+    echo "[INFO] No-IP DUC installed successfully."
+    read -p "Enter your No-IP username: " NOIP_USER
+    read -sp "Enter your No-IP password: " NOIP_PASS
+    echo
+    read -p "Enter your No-IP hostname (e.g., myhostname.ddns.net): " NOIP_HOST
+    if ./noip-duc -g "$NOIP_HOST" -u "$NOIP_USER" -p "$NOIP_PASS"; then
+      echo "[INFO] No-IP DUC configured successfully for hostname $NOIP_HOST."
+    else
+      echo "[ERROR] Failed to configure No-IP DUC. Please check your credentials and try again."
+      exit 1
+    fi
+  else
+    echo "[ERROR] Failed to install No-IP DUC binaries. Exiting."
+    exit 1
+  fi
 }
 
 # Main menu
