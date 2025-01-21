@@ -5,41 +5,7 @@ generate_password() {
   openssl rand -base64 12
 }
 
-# Function to install and configure SSH server
-install_ssh() {
-  echo "[INFO] Ensuring SSH server is installed..."
-  if ! dpkg -l | grep -q openssh-server; then
-    apt update -y
-    if apt install openssh-server -y; then
-      echo "[INFO] SSH server installed successfully."
-    else
-      echo "[ERROR] Failed to install SSH server. Exiting."
-      exit 1
-    fi
-  else
-    echo "[INFO] SSH server is already installed."
-  fi
 
-  sed -i 's/^#*PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
-  sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
-
-  # Check and restart the appropriate SSH service
-  if systemctl list-units --type=service | grep -q "ssh.service"; then
-    SSH_SERVICE="ssh.service"
-  elif systemctl list-units --type=service | grep -q "sshd.service"; then
-    SSH_SERVICE="sshd.service"
-  else
-    echo "[ERROR] SSH service not found. Please verify your SSH installation."
-    exit 1
-  fi
-
-  if systemctl restart "$SSH_SERVICE"; then
-    echo "[INFO] Root login with password enabled. SSH service restarted."
-  else
-    echo "[ERROR] Failed to restart $SSH_SERVICE. Please check your configuration."
-    exit 1
-  fi
-}
 
 # Function to install Apache, MySQL, and PHP
 install_apache_mysql_php() {
@@ -209,13 +175,11 @@ read -p "Enter your choice: " CHOICE
 
 case $CHOICE in
   1)
-    install_ssh
     install_apache_mysql_php
     install_matomo
     install_noip
     ;;
   2)
-    install_ssh
     install_apache_mysql_php
     ;;
   3)
