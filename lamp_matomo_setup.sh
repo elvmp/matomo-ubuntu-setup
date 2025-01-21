@@ -172,7 +172,6 @@ read -p "Enter your choice: " CHOICE
 
 case $CHOICE in
   1)
-    install_ssh
     install_apache_mysql_php
     install_matomo
     ;;
