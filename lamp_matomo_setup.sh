@@ -5,7 +5,32 @@ generate_password() {
   openssl rand -base64 12
 }
 
+# Function to install and configure SSH server
+install_ssh() {
+  echo "[INFO] Ensuring SSH server is installed..."
+  if ! dpkg -l | grep -q openssh-server; then
+    apt update -y
+    if apt install openssh-server -y; then
+      echo "[INFO] SSH server installed successfully."
+    else
+      echo "[ERROR] Failed to install SSH server. Exiting."
+      exit 1
+    fi
+  else
+    echo "[INFO] SSH server is already installed."
+  fi
 
+  sed -i 's/^#*PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
+  sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+
+  # Attempt to restart SSH service
+  if systemctl restart ssh || systemctl restart sshd; then
+    echo "[INFO] Root login with password enabled. SSH service restarted."
+  else
+    echo "[ERROR] Failed to restart SSH service. Please check your configuration."
+    exit 1
+  fi
+}
 
 # Function to install Apache, MySQL, and PHP
 install_apache_mysql_php() {
@@ -90,9 +115,6 @@ install_matomo() {
   MATOMO_DB_NAME="matomo"
   MATOMO_DB_USER="matomo_user"
   MATOMO_DB_PASSWORD=$(generate_password)
-  MATOMO_ADMIN_USERNAME="admin"
-  MATOMO_ADMIN_PASSWORD=$(generate_password)
-  MATOMO_ADMIN_EMAIL="admin@example.com"
 
   mysql --execute="CREATE DATABASE ${MATOMO_DB_NAME};"
   mysql --execute="CREATE USER '${MATOMO_DB_USER}'@'localhost' IDENTIFIED BY '${MATOMO_DB_PASSWORD}';"
@@ -117,7 +139,6 @@ trusted_hosts[] = "${HOSTNAME}"
 EOF
 
   php ${MATOMO_DIR}/console development:disable
-  php ${MATOMO_DIR}/console core:create-user --superuser --login=${MATOMO_ADMIN_USERNAME} --password=${MATOMO_ADMIN_PASSWORD} --email=${MATOMO_ADMIN_EMAIL}
 
   chown -R www-data:www-data ${MATOMO_DIR}
   chmod -R 755 ${MATOMO_DIR}
@@ -135,49 +156,18 @@ EOF
   echo "[INFO] PHP test file created at ${VHOST_DIR}/info.php."
 }
 
-# Function to install No-IP Dynamic Update Client
-install_noip() {
-  echo "[INFO] Installing No-IP Dynamic Update Client (DUC)..."
-  wget --content-disposition https://www.noip.com/download/linux/latest -O noip.tar.gz
-  tar xf noip.tar.gz
-  NOIP_DIR=$(find . -type d -name "noip-duc-"* | head -n 1)
-  if [ -z "$NOIP_DIR" ]; then
-    echo "[ERROR] No-IP DUC directory not found after extraction. Exiting."
-    exit 1
-  fi
-  cd $NOIP_DIR/binaries
-  if apt install ./*.deb; then
-    echo "[INFO] No-IP DUC installed successfully."
-    read -p "Enter your No-IP username: " NOIP_USER
-    read -sp "Enter your No-IP password: " NOIP_PASS
-    echo
-    read -p "Enter your No-IP hostname (e.g., myhostname.ddns.net): " NOIP_HOST
-    if ./noip-duc -g "$NOIP_HOST" -u "$NOIP_USER" -p "$NOIP_PASS"; then
-      echo "[INFO] No-IP DUC configured successfully for hostname $NOIP_HOST."
-    else
-      echo "[ERROR] Failed to configure No-IP DUC. Please check your credentials and try again."
-      exit 1
-    fi
-  else
-    echo "[ERROR] Failed to install No-IP DUC binaries. Exiting."
-    exit 1
-  fi
-}
-
 # Main menu
 echo "Select an installation option:"
-echo "1. Full install (Apache, MySQL, PHP, Matomo, No-IP DUC)"
+echo "1. Full install (Apache, MySQL, PHP, Matomo)"
 echo "2. Install Apache, MySQL, and PHP"
 echo "3. Install Matomo"
-echo "4. Install No-IP Dynamic Update Client (DUC)"
-echo "5. Exit"
+echo "4. Exit"
 read -p "Enter your choice: " CHOICE
 
 case $CHOICE in
   1)
     install_apache_mysql_php
     install_matomo
-    install_noip
     ;;
   2)
     install_apache_mysql_php
@@ -186,9 +176,6 @@ case $CHOICE in
     install_matomo
     ;;
   4)
-    install_noip
-    ;;
-  5)
     echo "Exiting."
     exit 0
     ;;
@@ -204,9 +191,6 @@ if [ "$CHOICE" == "1" ]; then
   echo "[INFO] Full setup completed successfully!"
   echo "========================================="
   echo "MySQL Root Password: ${MYSQL_ROOT_PASSWORD}"
-  echo "Matomo Admin Username: ${MATOMO_ADMIN_USERNAME}"
-  echo "Matomo Admin Email: ${MATOMO_ADMIN_EMAIL}"
-  echo "Matomo Admin Password: ${MATOMO_ADMIN_PASSWORD}"
   echo "Matomo Database User Password: ${MATOMO_DB_PASSWORD}"
   echo "Matomo URL: http://${IP_ADDRESS}/matomo"
   echo "PHP Info URL: http://${IP_ADDRESS}/info.php"
