@@ -5,6 +5,33 @@ generate_password() {
   openssl rand -base64 12
 }
 
+# Function to install and configure SSH server
+install_ssh() {
+  echo "[INFO] Ensuring SSH server is installed..."
+  if ! dpkg -l | grep -q openssh-server; then
+    apt update -y
+    if apt install openssh-server -y; then
+      echo "[INFO] SSH server installed successfully."
+    else
+      echo "[ERROR] Failed to install SSH server. Exiting."
+      exit 1
+    fi
+  else
+    echo "[INFO] SSH server is already installed."
+  fi
+
+  sed -i 's/^#*PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
+  sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+
+  # Attempt to restart SSH service
+  if systemctl restart ssh || systemctl restart sshd; then
+    echo "[INFO] Root login with password enabled. SSH service restarted."
+  else
+    echo "[ERROR] Failed to restart SSH service. Please check your configuration."
+    exit 1
+  fi
+}
+
 # Function to install Apache, MySQL, and PHP
 install_apache_mysql_php() {
   echo "[INFO] Installing Apache..."
