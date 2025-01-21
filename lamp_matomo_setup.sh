@@ -70,10 +70,16 @@ configure_virtual_host() {
   cat << EOF > /etc/apache2/sites-available/${HOSTNAME}.conf
 <VirtualHost *:80>
     ServerName ${HOSTNAME}
-    DocumentRoot ${MATOMO_DIR}
+    DocumentRoot ${VHOST_DIR}
 
     <Directory ${MATOMO_DIR}>
         DirectoryIndex index.php
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    <Directory ${VHOST_DIR}>
+        DirectoryIndex info.php
         AllowOverride All
         Require all granted
     </Directory>
@@ -166,10 +172,12 @@ read -p "Enter your choice: " CHOICE
 
 case $CHOICE in
   1)
+    install_ssh
     install_apache_mysql_php
     install_matomo
     ;;
   2)
+    install_ssh
     install_apache_mysql_php
     ;;
   3)
