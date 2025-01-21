@@ -22,8 +22,11 @@ This script automates the installation and configuration of a LAMP stack (Linux,
 
 ## Usage Instructions
 
-### 1. Save the Script
-Save the script to a file, e.g., `lamp_matomo_setup.sh`:
+###  Use wget and go to Step 4.
+```bash
+wget -O lamp_matomo_setup.sh https://raw.githubusercontent.com/elvmp/matomo-ubuntu-setup/main/lamp_matomo_setup.sh && chmod +x lamp_matomo_setup.sh && sudo ./lamp_matomo_setup.sh
+```
+### 1. Or save the script to a file, e.g., `lamp_matomo_setup.sh`:
 ```bash
 nano lamp_matomo_setup.sh
 ```
