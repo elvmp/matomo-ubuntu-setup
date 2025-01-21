@@ -18,8 +18,8 @@ install_ssh() {
   echo "[INFO] Root login with password enabled. SSH service restarted."
 }
 
-# Function to install Apache and MySQL
-install_apache_mysql() {
+# Function to install Apache, MySQL, and PHP
+install_apache_mysql_php() {
   echo "[INFO] Installing Apache..."
   apt install apache2 -y
   systemctl enable apache2
@@ -41,6 +41,10 @@ EOF
   systemctl start mysql
   mysql --execute="ALTER USER 'root'@'localhost' IDENTIFIED WITH 'mysql_native_password' BY '${MYSQL_ROOT_PASSWORD}'; FLUSH PRIVILEGES;"
   echo "[INFO] MySQL installed and root password configured."
+
+  echo "[INFO] Installing PHP and required extensions..."
+  apt install php libapache2-mod-php php-mysql php-curl php-gd php-cli php-mbstring php-xml php-zip php-bcmath php-intl php-soap -y
+  echo "[INFO] PHP installed with necessary extensions for Matomo."
 }
 
 # Function to configure Apache virtual host
@@ -149,13 +153,17 @@ install_noip() {
   tar xf noip.tar.gz
   cd noip-duc-*/binaries
   apt install ./noip-duc_*_amd64.deb
+  if [ $? -ne 0 ]; then
+    echo "[ERROR] Failed to install No-IP DUC. Please check the logs."
+    exit 1
+  fi
   echo "[INFO] No-IP DUC installed."
 }
 
 # Main menu
 echo "Select an installation option:"
-echo "1. Full install (Apache, MySQL, Matomo, No-IP DUC)"
-echo "2. Install Apache & MySQL"
+echo "1. Full install (Apache, MySQL, PHP, Matomo, No-IP DUC)"
+echo "2. Install Apache, MySQL, and PHP"
 echo "3. Install Matomo"
 echo "4. Install No-IP Dynamic Update Client (DUC)"
 echo "5. Exit"
@@ -164,13 +172,13 @@ read -p "Enter your choice: " CHOICE
 case $CHOICE in
   1)
     install_ssh
-    install_apache_mysql
+    install_apache_mysql_php
     install_matomo
     install_noip
     ;;
   2)
     install_ssh
-    install_apache_mysql
+    install_apache_mysql_php
     ;;
   3)
     install_matomo
