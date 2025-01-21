@@ -23,10 +23,20 @@ install_ssh() {
   sed -i 's/^#*PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
   sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
 
-  if systemctl restart sshd; then
+  # Check and restart the appropriate SSH service
+  if systemctl list-units --type=service | grep -q "ssh.service"; then
+    SSH_SERVICE="ssh.service"
+  elif systemctl list-units --type=service | grep -q "sshd.service"; then
+    SSH_SERVICE="sshd.service"
+  else
+    echo "[ERROR] SSH service not found. Please verify your SSH installation."
+    exit 1
+  fi
+
+  if systemctl restart "$SSH_SERVICE"; then
     echo "[INFO] Root login with password enabled. SSH service restarted."
   else
-    echo "[ERROR] Failed to restart SSH service. Please check your configuration."
+    echo "[ERROR] Failed to restart $SSH_SERVICE. Please check your configuration."
     exit 1
   fi
 }
@@ -164,7 +174,7 @@ install_noip() {
   echo "[INFO] Installing No-IP Dynamic Update Client (DUC)..."
   wget --content-disposition https://www.noip.com/download/linux/latest -O noip.tar.gz
   tar xf noip.tar.gz
-  NOIP_DIR=$(find . -type d -name "noip-duc-*" | head -n 1)
+  NOIP_DIR=$(find . -type d -name "noip-duc-"* | head -n 1)
   if [ -z "$NOIP_DIR" ]; then
     echo "[ERROR] No-IP DUC directory not found after extraction. Exiting."
     exit 1
