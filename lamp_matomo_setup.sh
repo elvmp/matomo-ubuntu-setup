@@ -37,15 +37,21 @@ install_apache_mysql() {
 
 # Function to install Matomo
 install_matomo() {
-  read -p "Enter the directory where Matomo should be installed (default: /var/www/matomo): " MATOMO_DIR
-  MATOMO_DIR=${MATOMO_DIR:-/var/www/matomo}
-  echo "[INFO] Installing Matomo in $MATOMO_DIR..."
+  echo "[INFO] Installing Matomo..."
+  read -p "Enter your hostname (e.g., example.com): " HOSTNAME
+  if [ -z "$HOSTNAME" ]; then
+    echo "[ERROR] Hostname cannot be empty. Exiting."
+    exit 1
+  fi
+
+  VHOST_DIR="/var/www/${HOSTNAME}"
+  MATOMO_DIR="${VHOST_DIR}/matomo"
 
   mkdir -p ${MATOMO_DIR}
   git clone https://github.com/matomo-org/matomo.git ${MATOMO_DIR}
   cd ${MATOMO_DIR}
-  echo "[INFO] Checking out a stable release..."
-  git checkout 5.1.1
+  echo "[INFO] Checking out the stable release 5.2.1..."
+  git checkout 5.2.1
   git submodule update --init --recursive
   echo "[INFO] Installing Composer dependencies..."
   curl -sS https://getcomposer.org/installer | php
@@ -78,7 +84,7 @@ port = 3306
 
 [General]
 assume_secure_protocol = 0
-trusted_hosts[] = "localhost"
+trusted_hosts[] = "${HOSTNAME}"
 EOF
 
   php ${MATOMO_DIR}/console development:disable
@@ -87,7 +93,17 @@ EOF
   chown -R www-data:www-data ${MATOMO_DIR}
   chmod -R 755 ${MATOMO_DIR}
 
-  echo "[INFO] Matomo installed successfully."
+  # Create info.php for PHP verification
+  cat << EOF > ${VHOST_DIR}/info.php
+<?php
+phpinfo();
+?>
+EOF
+  chown www-data:www-data ${VHOST_DIR}/info.php
+  chmod 644 ${VHOST_DIR}/info.php
+
+  echo "[INFO] Matomo installed successfully in ${MATOMO_DIR}."
+  echo "[INFO] PHP test file created at ${VHOST_DIR}/info.php."
 }
 
 # Function to install No-IP Dynamic Update Client
@@ -147,5 +163,6 @@ if [ "$CHOICE" == "1" ]; then
   echo "Matomo Admin Password: ${MATOMO_ADMIN_PASSWORD}"
   echo "Matomo Database User Password: ${MATOMO_DB_PASSWORD}"
   echo "Matomo URL: http://${IP_ADDRESS}/matomo"
+  echo "PHP Info URL: http://${IP_ADDRESS}/info.php"
   echo "========================================="
 fi
