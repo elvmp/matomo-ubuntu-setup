@@ -26,6 +26,14 @@ install_apache_mysql() {
   systemctl start apache2
   echo "[INFO] Apache installed and started."
 
+  echo "[INFO] Setting priority for index.php..."
+  cat << EOF > /etc/apache2/mods-enabled/dir.conf
+<IfModule mod_dir.c>
+    DirectoryIndex index.php index.html index.cgi index.pl index.xhtml index.htm
+</IfModule>
+EOF
+  systemctl restart apache2
+
   MYSQL_ROOT_PASSWORD=$(generate_password)
   echo "[INFO] Installing MySQL..."
   apt install mysql-server -y
@@ -33,6 +41,36 @@ install_apache_mysql() {
   systemctl start mysql
   mysql --execute="ALTER USER 'root'@'localhost' IDENTIFIED WITH 'mysql_native_password' BY '${MYSQL_ROOT_PASSWORD}'; FLUSH PRIVILEGES;"
   echo "[INFO] MySQL installed and root password configured."
+}
+
+# Function to configure Apache virtual host
+configure_virtual_host() {
+  echo "[INFO] Configuring Apache virtual host..."
+  VHOST_DIR="/var/www/${HOSTNAME}"
+  MATOMO_DIR="${VHOST_DIR}/matomo"
+
+  cat << EOF > /etc/apache2/sites-available/${HOSTNAME}.conf
+<VirtualHost *:80>
+    ServerName ${HOSTNAME}
+    DocumentRoot ${MATOMO_DIR}
+
+    <Directory ${MATOMO_DIR}>
+        DirectoryIndex index.php
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    ErrorLog \${APACHE_LOG_DIR}/${HOSTNAME}_error.log
+    CustomLog \${APACHE_LOG_DIR}/${HOSTNAME}_access.log combined
+</VirtualHost>
+EOF
+
+  mkdir -p ${MATOMO_DIR}
+  a2ensite ${HOSTNAME}
+  a2dissite 000-default
+  systemctl reload apache2
+
+  echo "[INFO] Virtual host configured for ${HOSTNAME}."
 }
 
 # Function to install Matomo
@@ -44,10 +82,8 @@ install_matomo() {
     exit 1
   fi
 
-  VHOST_DIR="/var/www/${HOSTNAME}"
-  MATOMO_DIR="${VHOST_DIR}/matomo"
+  configure_virtual_host
 
-  mkdir -p ${MATOMO_DIR}
   git clone https://github.com/matomo-org/matomo.git ${MATOMO_DIR}
   cd ${MATOMO_DIR}
   echo "[INFO] Checking out the stable release 5.2.1..."
